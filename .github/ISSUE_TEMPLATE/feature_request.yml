@@ -1,0 +1,50 @@
+name: Propozycja ulepszenia (Feature Request)
+description: Zaproponuj nową funkcję, obsługę nowego formatu lub ulepszenie dla GalAnonim
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Dziękujemy za pomysły na rozwój GalAnonim! Każda propozycja pomaga tworzyć jeszcze lepsze narzędzie do ochrony prywatności dokumentów.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Jaki problem lub potrzebę rozwiązuje ta propozycja?
+      description: Jasny i zrozumiały opis problemu (np. „W mojej pracy często spotykam dokumenty w formacie RTF...”).
+      placeholder: "Chciałbym móc przetwarzać..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proponowane rozwiązanie
+      description: Jak wyobrażasz sobie działanie tej funkcji w aplikacji desktopowej?
+      placeholder: "Aplikacja mogłaby dodawać opcję..."
+    validations:
+      required: true
+
+  - type: dropdown
+    id: category
+    attributes:
+      label: Kategoria propozycji
+      description: Czego dotyczy zgłoszenie?
+      options:
+        - Nowy format pliku
+        - Silnik detekcji i słowniki językowe
+        - Własne reguły (Custom Regex)
+        - Interfejs użytkownika (UI / UX)
+        - Wydajność i przetwarzanie wsadowe
+        - Inne
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Dodatkowy kontekst / Rozważane alternatywy
+      description: Jak obecnie radzisz sobie z tym wyzwaniem?
+    validations:
+      required: false

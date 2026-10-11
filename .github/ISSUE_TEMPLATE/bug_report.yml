@@ -1,0 +1,105 @@
+name: Zgłoszenie błędu (Bug Report)
+description: Zgłoś problem lub nieoczekiwane zachowanie aplikacji desktopowej GalAnonim
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Dziękujemy za zgłoszenie! Upewnij się, że używasz najnowszej wersji instalatora z sekcji [Releases](https://github.com/zeslownikiem/galanonim-release/releases) oraz że nikt wcześniej nie zgłosił podobnego problemu.
+        
+        ⚠️ **Uwaga dotycząca prywatności:** Nie wklejaj w zgłoszeniu prawdziwych danych osobowych ani poufnych dokumentów. Używaj danych fikcyjnych (np. Jan Kowalski, PESEL z samych dziewiątek itp.).
+
+  - type: input
+    id: version
+    attributes:
+      label: Wersja aplikacji
+      description: Podaj wersję GalAnonim (widoczną w oknie „O programie” lub w nazwie pobranego instalatora, np. v0.20.0).
+      placeholder: "v0.20.0"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: System operacyjny
+      description: Na jakim systemie Windows uruchamiasz program?
+      options:
+        - Windows 11 (64-bit)
+        - Windows 10 (64-bit)
+        - Windows Server
+        - Inny
+    validations:
+      required: true
+
+  - type: dropdown
+    id: module
+    attributes:
+      label: Dotyczy modułu / formatu dokumentu
+      description: W jakim scenariuszu występuje błąd?
+      options:
+        - Instalacja / Aktualizator / Uruchomienie programu
+        - Dokument Word (.docx)
+        - Dokument OpenDocument (.odt)
+        - Dokument PDF (.pdf) — warstwa tekstowa
+        - Dokument PDF (.pdf) — skan / OCR
+        - Plik tekstowy (.txt)
+        - Tryb wklejanego tekstu (ze schowka)
+        - Baza słownika / Własne reguły Regex
+        - Logowanie i licencja (OAuth / Offline Grace Period)
+        - Inne
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Dokładny opis problemu
+      description: Co dokładnie poszło nie tak?
+      placeholder: "Po załadowaniu pliku DOCX zawierającego tabelę..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Kroki do odtworzenia błędu
+      description: Jak odtworzyć problem krok po kroku?
+      placeholder: |
+        1. Uruchom GalAnonim
+        2. Przeciągnij plik...
+        3. Kliknij przycisk „Anonimizuj”
+        4. Występuje błąd / brak zamaskowania...
+    validations:
+      required: true
+
+  - type: textarea
+    id: sample
+    attributes:
+      label: Przykładowy fragment tekstu (Fikcyjne dane)
+      description: Jeśli błąd dotyczy niedokładnego maskowania, wklej fragment wejściowy i wynikowy z zamazanymi prawdziwymi danymi.
+      placeholder: |
+        Przed: "Pismo podpisane przez Jana Nowaka w dniu..."
+        Po: "Pismo podpisane przez Jana Nowaka w dniu..." (nazwisko nie zostało zamaskowane)
+        Oczekiwano: "Pismo podpisane przez Jana ██████ w dniu..."
+    validations:
+      required: false
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logi diagnostyczne (opcjonalnie)
+      description: Jeśli aplikacja wygenerowała błąd, wklej fragment z pliku logu `%LOCALAPPDATA%\GalAnonim\logs\*.txt`.
+      render: text
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Weryfikacja
+      options:
+        - label: Potwierdzam, że treść zgłoszenia nie zawiera prawdziwych danych osobowych (RODO).
+          required: true
+        - label: Sprawdziłem, że błąd występuje w najnowszej wersji aplikacji.
+          required: true

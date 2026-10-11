@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Oficjalna strona internetowa
+    url: https://galanonim.pl
+    about: Dowiedz się więcej o projekcie GalAnonim, planach i zasadach działania.
+  - name: Pobieranie najnowszej wersji
+    url: https://github.com/zeslownikiem/galanonim-release/releases/latest
+    about: Pobierz najnowszy instalator dla systemu Windows (.exe).
+  - name: FAQ i Pomoc online
+    url: https://galanonim.pl/page/faq.html
+    about: Odpowiedzi na najczęściej zadawane pytania dotyczące prywatności i RODO.
