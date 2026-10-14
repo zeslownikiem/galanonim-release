@@ -41,22 +41,22 @@ jobs:
       - name: 4. Weryfikacja bazy slow i zasobow
         shell: powershell
         run: |
-          $resourcesDirs = @(\x22GalAnonim\Resources\x22, \x22GalAnonim\bin\Release\net10.0-windows\win-x64\publish\Resources\x22)
+          $resourcesDirs = @("GalAnonim\Resources", "GalAnonim\bin\Release\net10.0-windows\win-x64\publish\Resources")
           foreach ($dir in $resourcesDirs) {
             if (Test-Path $dir) {
-              $files = Get-ChildItem -Path $dir -Filter \x22galanonim.db*\x22
+              $files = Get-ChildItem -Path $dir -Filter "galanonim.db*"
               foreach ($f in $files) {
-                if ($f.Extension -eq \x22.stamp\x22) { continue }
+                if ($f.Extension -eq ".stamp") { continue }
                 $bytes = [System.IO.File]::ReadAllBytes($f.FullName)
                 if ($bytes.Length -ge 2 -and $bytes[0] -eq 0x1F -and $bytes[1] -eq 0x8B) {
-                  Write-Error \x22Plik $($f.FullName) jest nieszyfrowanym archiwum GZip (magia 1F 8B)!\x22
+                  Write-Error "Plik $($f.FullName) jest nieszyfrowanym archiwum GZip (magia 1F 8B)!"
                   exit 1
                 }
-                if ($bytes.Length -ge 16 -and [System.Text.Encoding]::ASCII.GetString($bytes[0..15]).StartsWith(\x22SQLite format 3\x22)) {
-                  Write-Error \x22Plik $($f.FullName) jest nieszyfrowana baza SQLite!\x22
+                if ($bytes.Length -ge 16 -and [System.Text.Encoding]::ASCII.GetString($bytes[0..15]).StartsWith("SQLite format 3")) {
+                  Write-Error "Plik $($f.FullName) jest nieszyfrowana baza SQLite!"
                   exit 1
                 }
-                Write-Host \x22Zasob $($f.Name) zweryfikowany: brak czystego tekstu.\x22
+                Write-Host "Zasob $($f.Name) zweryfikowany: brak czystego tekstu."
               }
             }
           }
@@ -67,10 +67,10 @@ jobs:
           $iscc = (Get-Command iscc -ErrorAction SilentlyContinue)?.Source
           if (-not $iscc -or -not (Test-Path $iscc)) {
             $candidates = @(
-              \x22$([System.Environment]::GetFolderPath('ProgramFilesX86'))\Inno Setup 6\iscc.exe\x22,
-              \x22$([System.Environment]::GetFolderPath('ProgramFiles'))\Inno Setup 6\iscc.exe\x22,
-              \x22$env:LOCALAPPDATA\Programs\Inno Setup 6\iscc.exe\x22,
-              \x22C:\ProgramData\chocolatey\bin\iscc.exe\x22
+              "$([System.Environment]::GetFolderPath('ProgramFilesX86'))\Inno Setup 6\iscc.exe",
+              "$([System.Environment]::GetFolderPath('ProgramFiles'))\Inno Setup 6\iscc.exe",
+              "$env:LOCALAPPDATA\Programs\Inno Setup 6\iscc.exe",
+              "C:\ProgramData\chocolatey\bin\iscc.exe"
             )
             foreach ($c in $candidates) {
               if (Test-Path $c) { $iscc = $c; break }
@@ -80,43 +80,43 @@ jobs:
             choco install innosetup --yes --no-progress
             $iscc = (Get-Command iscc -ErrorAction SilentlyContinue)?.Source
             if (-not $iscc) {
-              $iscc = \x22$([System.Environment]::GetFolderPath('ProgramFilesX86'))\Inno Setup 6\iscc.exe\x22
+              $iscc = "$([System.Environment]::GetFolderPath('ProgramFilesX86'))\Inno Setup 6\iscc.exe"
             }
           }
-          Write-Host \x22Inno Setup zlokalizowany: $iscc\x22
-          Add-Content -Path $env:GITHUB_ENV -Value \x22ISCC_PATH=$iscc\x22
+          Write-Host "Inno Setup zlokalizowany: $iscc"
+          Add-Content -Path $env:GITHUB_ENV -Value "ISCC_PATH=$iscc"
 
       - name: 6. Wyciagniecie wersji aplikacji
         id: extract_version
         shell: powershell
         run: |
-          [xml]$csproj = Get-Content \x22GalAnonim/GalAnonim.csproj\x22
+          [xml]$csproj = Get-Content "GalAnonim/GalAnonim.csproj"
           $version = ($csproj.Project.PropertyGroup.Version | Out-String).Trim()
-          if (-not $version) { $version = \x221.0.0\x22 }
-          Write-Host \x22Wersja aplikacji: $version\x22
-          Add-Content -Path $env:GITHUB_ENV -Value \x22APP_VERSION=$version\x22
+          if (-not $version) { $version = "1.0.0" }
+          Write-Host "Wersja aplikacji: $version"
+          Add-Content -Path $env:GITHUB_ENV -Value "APP_VERSION=$version"
 
       - name: 7. Pobranie WebView2 Bootstrapper
         shell: powershell
         run: |
-          Invoke-WebRequest -Uri \x22https://go.microsoft.com/fwlink/p/?LinkId=2124703\x22 -OutFile \x22Deployment/MicrosoftEdgeWebview2Setup.exe\x22 -UseBasicParsing
+          Invoke-WebRequest -Uri "https://go.microsoft.com/fwlink/p/?LinkId=2124703" -OutFile "Deployment/MicrosoftEdgeWebview2Setup.exe" -UseBasicParsing
 
       - name: 8. Pobranie Morfeusz 2 (morfeusz2.dll + SGJP)
         shell: powershell
         run: |
-          & \x22Deployment/Get-Morfeusz.ps1\x22 -TargetDir \x22Deployment\x22
-          $publishDir = \x22GalAnonim\bin\Release\net10.0-windows\win-x64\publish\x22
+          & "Deployment/Get-Morfeusz.ps1" -TargetDir "Deployment"
+          $publishDir = "GalAnonim\bin\Release\net10.0-windows\win-x64\publish"
           if (Test-Path $publishDir) {
-            Copy-Item -Path \x22Deployment\morfeusz2.dll\x22 -Destination (Join-Path $publishDir \x22morfeusz2.dll\x22) -Force
-            Write-Host \x22morfeusz2.dll skopiowany do: $publishDir\x22
+            Copy-Item -Path "Deployment\morfeusz2.dll" -Destination (Join-Path $publishDir "morfeusz2.dll") -Force
+            Write-Host "morfeusz2.dll skopiowany do: $publishDir"
           }
 
       - name: 9. Kompilacja instalatora przez Inno Setup
         shell: powershell
         run: |
-          Write-Host \x22Kompilowanie instalatora Inno Setup v$env:APP_VERSION...\x22
-          & \x22$env:ISCC_PATH\x22 \x22/dMyAppVersion=$env:APP_VERSION\x22 \x22Deployment/InnoSetup.iss\x22
-          Get-ChildItem -Path \x22Deployment/Output\x22 -Filter \x22*.exe\x22 | Format-Table Name, Length
+          Write-Host "Kompilowanie instalatora Inno Setup v$env:APP_VERSION..."
+          & "$env:ISCC_PATH" "/dMyAppVersion=$env:APP_VERSION" "Deployment/InnoSetup.iss"
+          Get-ChildItem -Path "Deployment/Output" -Filter "*.exe" | Format-Table Name, Length
 
       - name: 10. Upload instalatora jako artefakt CI/CD
         uses: actions/upload-artifact@v4
