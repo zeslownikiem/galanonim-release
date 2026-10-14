@@ -11,6 +11,8 @@ on:
         description: 'Publish as official GitHub Release in galanonim-release'
         type: boolean
         default: false
+  repository_dispatch:
+    types: [trigger-installer-build]
 
 permissions:
   contents: write
@@ -26,7 +28,7 @@ jobs:
         with:
           repository: zeslownikiem/gal-anonym
           token: ${{ secrets.GAL_ANONYM_READ_TOKEN }}
-          ref: ${{ github.event.inputs.ref || 'main' }}
+          ref: ${{ github.event.client_payload.ref || github.event.inputs.ref || 'main' }}
 
       - name: 2. Konfiguracja srodowiska .NET 10
         uses: actions/setup-dotnet@v4
@@ -121,10 +123,10 @@ jobs:
           retention-days: 7
 
       - name: 11. Publikacja w GitHub Releases (opcjonalnie)
-        if: github.event.inputs.create_release == 'true'
+        if: ${{ github.event.inputs.create_release == 'true' || github.event.client_payload.create_release == 'true' || (github.event_name == 'repository_dispatch' && github.event.client_payload.create_release != 'false') }}
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ env.APP_VERSION }}
-          name: GalAnonim v${{ env.APP_VERSION }}
+          tag_name: ${{ github.event.client_payload.tag || format('v{0}', env.APP_VERSION) }}
+          name: GalAnonim ${{ github.event.client_payload.tag || format('v{0}', env.APP_VERSION) }}
           files: Deployment/Output/*.exe
           generate_release_notes: true
