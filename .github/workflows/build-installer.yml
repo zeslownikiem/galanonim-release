@@ -1,0 +1,121 @@
+name: Build Windows Desktop Installer (Always Free)
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Branch or Tag in gal-anonym to build"
+        required: true
+        default: "main"
+      create_release:
+        description: "Publish as official GitHub Release in galanonim-release"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  build-installer:
+    name: Build Installer on Free GitHub Windows Runner
+    runs-on: windows-latest
+    steps:
+      - name: 1. Pobranie kodu aplikacji (zeslownikiem/gal-anonym)
+        uses: actions/checkout@v4
+        with:
+          repository: zeslownikiem/gal-anonym
+          token: ${{ secrets.GAL_ANONYM_READ_TOKEN }}
+          ref: ${{ github.event.inputs.ref || "main" }}
+
+      - name: 2. Konfiguracja srodowiska .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+          cache: true
+          cache-dependency-path: "**/*.csproj"
+
+      - name: 3. Publikacja aplikacji WinForms (Self-Contained .NET 10)
+        run: dotnet publish GalAnonim/GalAnonim.csproj -c Release -f net10.0-windows -r win-x64 --self-contained true -p:PublishSingleFile=false
+
+      - name: 4. Weryfikacja bazy slow i zasobow
+        shell: powershell
+        run: |
+          $resourcesDirs = @("GalAnonim\Resources", "GalAnonim\bin\Release\net10.0-windows\win-x64\publish\Resources")
+          foreach ($dir in $resourcesDirs) {
+            if (Test-Path $dir) {
+              $files = Get-ChildItem -Path $dir -Filter "galanonim.db*"
+              foreach ($f in $files) {
+                if ($f.Extension -eq ".stamp") { continue }
+                $bytes = [System.IO.File]::ReadAllBytes($f.FullName)
+                if ($bytes.Length -ge 2 -and $bytes[0] -eq 0x1F -and $bytes[1] -eq 0x8B) {
+                  Write-Error "Plik $($f.FullName) jest nieszyfrowanym archiwum GZip (magia 1F 8B)!"
+                  exit 1
+                }
+                if ($bytes.Length -ge 16 -and [System.Text.Encoding]::ASCII.GetString($bytes[0..15]).StartsWith("SQLite format 3")) {
+                  Write-Error "Plik $($f.FullName) jest nieszyfrowana baza SQLite!"
+                  exit 1
+                }
+                Write-Host "Zasob $($f.Name) zweryfikowany: brak czystego tekstu."
+              }
+            }
+          }
+
+      - name: 5. Instalacja Inno Setup przez Chocolatey
+        shell: powershell
+        run: |
+          choco install innosetup --yes --no-progress
+          $isccPath = "$env:ProgramFiles(x86)\Inno Setup 6\iscc.exe"
+          if (-not (Test-Path $isccPath)) {
+            $isccPath = "$env:ProgramFiles\Inno Setup 6\iscc.exe"
+          }
+          Write-Host "Inno Setup gotowy w: $isccPath"
+          Add-Content -Path $env:GITHUB_ENV -Value "ISCC_PATH=$isccPath"
+
+      - name: 6. Wyciagniecie wersji aplikacji
+        id: extract_version
+        shell: powershell
+        run: |
+          [xml]$csproj = Get-Content "GalAnonim/GalAnonim.csproj"
+          $version = $csproj.Project.PropertyGroup.Version
+          if (-not $version) { $version = "1.0.0" }
+          Write-Host "Wersja aplikacji: $version"
+          Add-Content -Path $env:GITHUB_ENV -Value "APP_VERSION=$version"
+
+      - name: 7. Pobranie WebView2 Bootstrapper
+        shell: powershell
+        run: |
+          Invoke-WebRequest -Uri "https://go.microsoft.com/fwlink/p/?LinkId=2124703" -OutFile "Deployment/MicrosoftEdgeWebview2Setup.exe" -UseBasicParsing
+
+      - name: 8. Pobranie Morfeusz 2 (morfeusz2.dll + SGJP)
+        shell: powershell
+        run: |
+          & "Deployment/Get-Morfeusz.ps1" -TargetDir "Deployment"
+          $publishDir = "GalAnonim\bin\Release\net10.0-windows\win-x64\publish"
+          if (Test-Path $publishDir) {
+            Copy-Item -Path "Deployment\morfeusz2.dll" -Destination (Join-Path $publishDir "morfeusz2.dll") -Force
+            Write-Host "morfeusz2.dll skopiowany do: $publishDir"
+          }
+
+      - name: 9. Kompilacja instalatora przez Inno Setup
+        shell: powershell
+        run: |
+          Write-Host "Kompilowanie instalatora Inno Setup v$env:APP_VERSION..."
+          & "$env:ISCC_PATH" "/dMyAppVersion=$env:APP_VERSION" "Deployment/InnoSetup.iss"
+          Get-ChildItem -Path "Deployment/Output" -Filter "*.exe" | Format-Table Name, Length
+
+      - name: 10. Upload instalatora jako artefakt CI/CD
+        uses: actions/upload-artifact@v4
+        with:
+          name: GalAnonim-Setup-v${{ env.APP_VERSION }}-x64
+          path: Deployment/Output/*.exe
+          retention-days: 7
+
+      - name: 11. Publikacja w GitHub Releases (opcjonalnie)
+        if: github.event.inputs.create_release == "true"
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ env.APP_VERSION }}
+          name: GalAnonim v${{ env.APP_VERSION }}
+          files: Deployment/Output/*.exe
+          generate_release_notes: true
