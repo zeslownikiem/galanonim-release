@@ -1,4 +1,4 @@
-﻿name: CI/CD Pipeline & Windows Installer (Always Free)
+name: CI/CD Pipeline & Windows Installer (Always Free)
 
 on:
   workflow_dispatch:
@@ -67,9 +67,84 @@ jobs:
           REQUIRE_MORFEUSZ: '1'
         run: dotnet test GalAnonim.Tests/GalAnonim.Tests.csproj -c Release
 
+      - name: 7. Testy Frontendu JavaScript (node:test)
+        run: node --test GalAnonim.Tests/Frontend/hosted-batch.test.cjs
+
+  smoke-test-windows:
+    name: UI Smoke Test (WebView2)
+    needs: [test-windows]
+    runs-on: windows-latest
+    steps:
+      - name: 1. Pobranie kodu aplikacji (zeslownikiem/gal-anonym)
+        uses: actions/checkout@v4
+        with:
+          repository: zeslownikiem/gal-anonym
+          token: ${{ secrets.GAL_ANONYM_READ_TOKEN }}
+          ref: ${{ github.event.client_payload.ref || github.event.inputs.ref || 'main' }}
+
+      - name: 2. Konfiguracja srodowiska .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+          cache: true
+          cache-dependency-path: '**/*.csproj'
+
+      - name: 3. Budowanie aplikacji WinForms (Release)
+        run: dotnet build GalAnonim/GalAnonim.csproj -c Release
+
+      - name: 4. Pobranie biblioteki Morfeusz 2 dla smoke testu
+        shell: powershell
+        run: |
+          & "Deployment/Get-Morfeusz.ps1" -TargetDir "GalAnonim/bin/Release/net10.0-windows"
+
+      - name: 5. Uruchomienie smoke testu (renderowanie UI + zrzut ekranu)
+        shell: powershell
+        env:
+          GALANONIM_SMOKE_SCREENSHOT: ${{ github.workspace }}\smoke-screenshot.png
+        run: |
+          $exe = Join-Path $pwd "GalAnonim\bin\Release\net10.0-windows\GalAnonim.exe"
+          Write-Host "Uruchamianie smoke testu: $exe"
+          $proc = Start-Process -FilePath $exe -ArgumentList '--smoke-test' -Wait -PassThru -RedirectStandardOutput "smoke-stdout.log" -RedirectStandardError "smoke-stderr.log"
+          $exitCode = $proc.ExitCode
+          Write-Host "Exit code: $exitCode"
+          if (Test-Path "smoke-stdout.log") { Write-Host "--- stdout ---"; Get-Content "smoke-stdout.log" }
+          if (Test-Path "smoke-stderr.log") { Write-Host "--- stderr ---"; Get-Content "smoke-stderr.log" }
+
+          if ($exitCode -ne 0) {
+            Write-Error "Smoke test zakonczony niepowodzeniem (exit code $exitCode)."
+            exit $exitCode
+          }
+          if (-not (Test-Path $env:GALANONIM_SMOKE_SCREENSHOT)) {
+            Write-Error "Zrzut ekranu nie zostal zapisany mimo exit code 0."
+            exit 1
+          }
+          Write-Host "Smoke test OK - zrzut ekranu: $env:GALANONIM_SMOKE_SCREENSHOT"
+
+      - name: 6. Kopiowanie logu Serilog do diagnostyki
+        if: always()
+        shell: powershell
+        run: |
+          $logDir = Join-Path $env:LOCALAPPDATA "GalAnonim\logs"
+          if (Test-Path $logDir) {
+            Copy-Item (Join-Path $logDir "*.txt") -Destination . -ErrorAction SilentlyContinue
+          }
+
+      - name: 7. Upload zrzutu ekranu i logow jako artefakt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: galanonim-smoke-diagnostics
+          path: |
+            smoke-screenshot.png
+            smoke-stdout.log
+            smoke-stderr.log
+            *.txt
+          retention-days: 7
+          if-no-files-found: ignore
+
   build-installer:
     name: Build & Publish Installer on Free GitHub Windows Runner
-    needs: [test-windows]
+    needs: [test-windows, smoke-test-windows]
     runs-on: windows-latest
     steps:
       - name: 1. Pobranie kodu aplikacji (zeslownikiem/gal-anonym)
