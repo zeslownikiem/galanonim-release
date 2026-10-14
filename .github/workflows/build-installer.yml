@@ -1,4 +1,4 @@
-﻿name: Build Windows Desktop Installer (Always Free)
+﻿name: CI/CD Pipeline & Windows Installer (Always Free)
 
 on:
   workflow_dispatch:
@@ -19,8 +19,57 @@ permissions:
   actions: write
 
 jobs:
+  test-windows:
+    name: Test on Windows (Unit Tests & Engine)
+    runs-on: windows-latest
+    steps:
+      - name: 1. Pobranie kodu aplikacji (zeslownikiem/gal-anonym)
+        uses: actions/checkout@v4
+        with:
+          repository: zeslownikiem/gal-anonym
+          token: ${{ secrets.GAL_ANONYM_READ_TOKEN }}
+          ref: ${{ github.event.client_payload.ref || github.event.inputs.ref || 'main' }}
+
+      - name: 2. Konfiguracja srodowiska .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+          cache: true
+          cache-dependency-path: '**/*.csproj'
+
+      - name: 3. Sprawdzenie czystosci kodu (Linter)
+        run: dotnet format GalAnonim/GalAnonim.csproj --verify-no-changes
+
+      - name: 4. Budowanie w konfiguracji Debug
+        run: dotnet build GalAnonim/GalAnonim.csproj -c Debug
+
+      - name: 5. Pobranie biblioteki Morfeusz 2
+        shell: powershell
+        run: |
+          $tempDir = Join-Path $env:RUNNER_TEMP "morfeusz"
+          if (-not (Test-Path $tempDir)) { New-Item -ItemType Directory -Path $tempDir -Force | Out-Null }
+          $zipPath = Join-Path $tempDir "morfeusz2.zip"
+          $meta = Invoke-RestMethod -Uri "https://pypi.org/pypi/morfeusz2/1.99.15/json"
+          $wheelUrl = ($meta.urls | Where-Object { $_.filename -like "*win_amd64*" } | Select-Object -First 1).url
+          Write-Host "Pobieranie Morfeusz 2 z: $wheelUrl"
+          Invoke-WebRequest -Uri $wheelUrl -OutFile $zipPath -UseBasicParsing
+          Expand-Archive -Path $zipPath -DestinationPath $tempDir -Force
+          $dll = Join-Path $tempDir "morfeusz2.dll"
+          if (-not (Test-Path $dll)) {
+            Write-Error "morfeusz2.dll nie znaleziony w rozpakowanym pakiecie."
+            exit 1
+          }
+          Write-Host "Morfeusz 2 DLL gotowy: $dll"
+          Add-Content -Path $env:GITHUB_ENV -Value "GALANONIM_MORFEUSZ=$dll"
+
+      - name: 6. Uruchomienie testow jednostkowych (dotnet test)
+        env:
+          REQUIRE_MORFEUSZ: '1'
+        run: dotnet test GalAnonim.Tests/GalAnonim.Tests.csproj -c Release
+
   build-installer:
-    name: Build Installer on Free GitHub Windows Runner
+    name: Build & Publish Installer on Free GitHub Windows Runner
+    needs: [test-windows]
     runs-on: windows-latest
     steps:
       - name: 1. Pobranie kodu aplikacji (zeslownikiem/gal-anonym)
@@ -40,7 +89,7 @@ jobs:
       - name: 3. Publikacja aplikacji WinForms (Self-Contained .NET 10)
         run: dotnet publish GalAnonim/GalAnonim.csproj -c Release -f net10.0-windows -r win-x64 --self-contained true -p:PublishSingleFile=false
 
-      - name: 4. Weryfikacja bazy slow i zasobow
+      - name: 4. Weryfikacja bazy slow i zasobow (AES-256-GCM)
         shell: powershell
         run: |
           $resourcesDirs = @("GalAnonim\Resources", "GalAnonim\bin\Release\net10.0-windows\win-x64\publish\Resources")
