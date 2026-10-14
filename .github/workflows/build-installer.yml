@@ -1,4 +1,4 @@
-name: Build Windows Desktop Installer (Always Free)
+﻿name: Build Windows Desktop Installer (Always Free)
 
 on:
   workflow_dispatch:
@@ -64,24 +64,19 @@ jobs:
       - name: 5. Przygotowanie Inno Setup
         shell: powershell
         run: |
-          $iscc = (Get-Command iscc -ErrorAction SilentlyContinue)?.Source
+          $cmd = Get-Command iscc -ErrorAction SilentlyContinue
+          $iscc = ""
+          if ($cmd) { $iscc = $cmd.Source }
           if (-not $iscc -or -not (Test-Path $iscc)) {
-            $candidates = @(
-              "$([System.Environment]::GetFolderPath('ProgramFilesX86'))\Inno Setup 6\iscc.exe",
-              "$([System.Environment]::GetFolderPath('ProgramFiles'))\Inno Setup 6\iscc.exe",
-              "$env:LOCALAPPDATA\Programs\Inno Setup 6\iscc.exe",
-              "C:\ProgramData\chocolatey\bin\iscc.exe"
-            )
-            foreach ($c in $candidates) {
-              if (Test-Path $c) { $iscc = $c; break }
-            }
+            $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
           }
-          if (-not $iscc) {
+          if (-not (Test-Path $iscc)) {
+            $iscc = "${env:ProgramFiles}\Inno Setup 6\ISCC.exe"
+          }
+          if (-not (Test-Path $iscc)) {
             choco install innosetup --yes --no-progress
-            $iscc = (Get-Command iscc -ErrorAction SilentlyContinue)?.Source
-            if (-not $iscc) {
-              $iscc = "$([System.Environment]::GetFolderPath('ProgramFilesX86'))\Inno Setup 6\iscc.exe"
-            }
+            $cmd = Get-Command iscc -ErrorAction SilentlyContinue
+            if ($cmd) { $iscc = $cmd.Source } else { $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" }
           }
           Write-Host "Inno Setup zlokalizowany: $iscc"
           Add-Content -Path $env:GITHUB_ENV -Value "ISCC_PATH=$iscc"
