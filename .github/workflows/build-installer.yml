@@ -246,11 +246,43 @@ jobs:
           path: Deployment/Output/*.exe
           retention-days: 7
 
+      - name: 10.1. Inteligentne czyszczenie starych artefaktow (max 2 diagnostyki / max 6 instalatorow)
+        shell: powershell
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $artifactsJson = gh api /repos/${{ github.repository }}/actions/artifacts --jq ".artifacts"
+          if ([string]::IsNullOrWhiteSpace($artifactsJson)) { exit 0 }
+
+          $artifacts = $artifactsJson | ConvertFrom-Json
+          if (-not $artifacts) { exit 0 }
+
+          $diagnostics = @($artifacts | Where-Object { $_.name -like "*diagnostics*" } | Sort-Object -Property created_at -Descending)
+          if ($diagnostics.Count -gt 2) {
+            foreach ($art in ($diagnostics | Select-Object -Skip 2)) {
+              Write-Host "Usuwanie starej diagnostyki: $($art.name) (ID: $($art.id))"
+              $null = gh api -X DELETE /repos/${{ github.repository }}/actions/artifacts/$($art.id) 2>&1
+              if ($LASTEXITCODE -ne 0) { $LASTEXITCODE = 0 }
+            }
+          }
+
+          $installers = @($artifacts | Where-Object { $_.name -like "*Setup*" } | Sort-Object -Property created_at -Descending)
+          $count = 0
+          foreach ($inst in $installers) {
+            $count++
+            if ($count -gt 6) {
+              Write-Host "Usuwanie starszego instalatora: $($inst.name) (ID: $($inst.id))"
+              $null = gh api -X DELETE /repos/${{ github.repository }}/actions/artifacts/$($inst.id) 2>&1
+              if ($LASTEXITCODE -ne 0) { $LASTEXITCODE = 0 }
+            }
+          }
+
       - name: 11. Publikacja w GitHub Releases (opcjonalnie)
-        if: ${{ github.event.inputs.create_release == 'true' || github.event.client_payload.create_release == 'true' || (github.event_name == 'repository_dispatch' && github.event.client_payload.create_release != 'false') }}
+        if: ${{ github.event.inputs.create_release == 'true' || github.event.inputs.create_release == true || github.event.client_payload.create_release == 'true' || github.event.client_payload.create_release == true }}
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.event.client_payload.tag || format('v{0}', env.APP_VERSION) }}
           name: GalAnonim ${{ github.event.client_payload.tag || format('v{0}', env.APP_VERSION) }}
           files: Deployment/Output/*.exe
           generate_release_notes: true
+
