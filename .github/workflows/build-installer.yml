@@ -161,12 +161,32 @@ jobs:
           cache: true
           cache-dependency-path: '**/*.csproj'
 
+      - name: 2.1. Cache zaszyfrowanego seeda slownika (Resources/galanonim.db.enc)
+        uses: actions/cache@v4
+        with:
+          path: |
+            GalAnonim/Resources/galanonim.db.enc
+            GalAnonim/Resources/galanonim.db.enc.stamp
+          key: seed-enc-v1-${{ hashFiles('GalAnonim/Database/WordListDatabaseBuilder.cs', 'GalAnonim/Database/SurnameLemmaImporter.cs', 'GalAnonim/Database/WordListRowsImporter.cs', 'Tools/DbImporter/Program.cs') }}
+
+      - name: 2.2. Budowa zaszyfrowanego seeda slownika (Resources/galanonim.db.enc)
+        env:
+          GAL_WORDLIST_KEY: ${{ secrets.GAL_WORDLIST_KEY }}
+          GAL_TOKEN_STANDARD: ${{ secrets.GAL_TOKEN_STANDARD }}
+        run: dotnet run --project Tools/DbImporter -c Release -- build-seed GalAnonim/Resources/galanonim.db.enc
+
       - name: 3. Publikacja aplikacji WinForms (Self-Contained .NET 10)
         run: dotnet publish GalAnonim/GalAnonim.csproj -c Release -f net10.0-windows -r win-x64 --self-contained true -p:PublishSingleFile=false
 
       - name: 4. Weryfikacja bazy slow i zasobow (AES-256-GCM)
         shell: powershell
         run: |
+          $encFile = "GalAnonim\bin\Release\net10.0-windows\win-x64\publish\Resources\galanonim.db.enc"
+          $stampFile = "GalAnonim\bin\Release\net10.0-windows\win-x64\publish\Resources\galanonim.db.enc.stamp"
+          if (-not (Test-Path $encFile) -or -not (Test-Path $stampFile)) {
+            Write-Error "Brak zaszyfrowanego seeda slownika ($encFile lub $stampFile) w publikacji!"
+            exit 1
+          }
           $resourcesDirs = @("GalAnonim\Resources", "GalAnonim\bin\Release\net10.0-windows\win-x64\publish\Resources")
           foreach ($dir in $resourcesDirs) {
             if (Test-Path $dir) {
@@ -182,7 +202,7 @@ jobs:
                   Write-Error "Plik $($f.FullName) jest nieszyfrowana baza SQLite!"
                   exit 1
                 }
-                Write-Host "Zasob $($f.Name) zweryfikowany: brak czystego tekstu."
+                Write-Host "Zasob $($f.Name) ($([math]::Round($f.Length / 1MB, 2)) MB) zweryfikowany: brak czystego tekstu."
               }
             }
           }
