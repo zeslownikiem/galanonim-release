@@ -303,6 +303,24 @@ jobs:
             }
           }
 
+      - name: 10.2. Przygotowanie kopii GalAnonim_Setup_latest.exe dla GitHub Releases
+        if: ${{ github.event.inputs.create_release == 'true' || github.event.inputs.create_release == true || github.event.client_payload.create_release == 'true' || github.event.client_payload.create_release == true }}
+        shell: powershell
+        run: |
+          $versionedExe = Join-Path "Deployment/Output" "GalAnonim_Setup_$env:APP_VERSION.exe"
+          $latestExe = Join-Path "Deployment/Output" "GalAnonim_Setup_latest.exe"
+          if (-not (Test-Path $versionedExe)) {
+            $firstExe = Get-ChildItem -Path "Deployment/Output" -Filter "*.exe" | Select-Object -First 1
+            if (-not $firstExe) {
+              Write-Error "Nie znaleziono zbudowanego instalatora .exe w Deployment/Output!"
+              exit 1
+            }
+            $versionedExe = $firstExe.FullName
+          }
+          Copy-Item -Path $versionedExe -Destination $latestExe -Force
+          Write-Host "Utworzono staly plik instalatora dla wydania: $latestExe"
+          Get-ChildItem -Path "Deployment/Output" -Filter "*.exe" | Format-Table Name, Length
+
       - name: 11. Publikacja w GitHub Releases (opcjonalnie)
         if: ${{ github.event.inputs.create_release == 'true' || github.event.inputs.create_release == true || github.event.client_payload.create_release == 'true' || github.event.client_payload.create_release == true }}
         uses: softprops/action-gh-release@v2

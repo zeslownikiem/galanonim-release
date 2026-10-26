@@ -19,7 +19,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/zeslownikiem/galanonim-release/releases/latest">
+  <a href="https://github.com/zeslownikiem/galanonim-release/releases/latest/download/GalAnonim_Setup_latest.exe">
     <img src="https://img.shields.io/badge/%E2%AC%87%EF%B8%8F_POBIERZ_NAJNOWSZ%C4%84_WERSJ%C4%98_INSTALLERA-0078D4?style=for-the-badge&logo=windows&logoColor=white" alt="Pobierz GalAnonim" />
   </a>
 </p>
@@ -89,8 +89,9 @@ W dobie powszechnego korzystania z narzędzi sztucznej inteligencji (ChatGPT, Mi
 ## 📥 Pobieranie i Instalacja
 
 ### Krok 1: Pobranie Instalatora
-Pobierz najnowszą wersję instalatora z sekcji wydań:  
-👉 **[Pobierz GalAnonim_Setup.exe (Najnowsze Wydanie)](https://github.com/zeslownikiem/galanonim-release/releases/latest)**
+Pobierz najnowszą wersję instalatora bezpośrednio (link zawsze aktualny):  
+👉 **[Pobierz GalAnonim_Setup_latest.exe (Najnowsze Wydanie)](https://github.com/zeslownikiem/galanonim-release/releases/latest/download/GalAnonim_Setup_latest.exe)**  
+*(lub zobacz wszystkie wydania na stronie [GitHub Releases](https://github.com/zeslownikiem/galanonim-release/releases/latest))*
 
 ### Krok 2: Uruchomienie Instalatora
 1. Uruchom pobrany plik `GalAnonim_Setup_X.Y.Z.exe`.
