@@ -41,12 +41,10 @@ jobs:
       - name: 3. Sprawdzenie czystosci kodu (Linter)
         run: dotnet format GalAnonim/GalAnonim.csproj --verify-no-changes
 
-      - name: 4. Budowanie w konfiguracji Debug
-        run: dotnet build GalAnonim/GalAnonim.csproj -c Debug
-
-      - name: 5. Pobranie biblioteki Morfeusz 2
+      - name: 4. Pobranie i weryfikacja SHA-256 biblioteki Morfeusz 2
         shell: powershell
         run: |
+          $expectedSha = "1f20fefc457ea674640f87bd8de129b6310bb063ac21a68ea02b0f86bbd9aafe"
           $tempDir = Join-Path $env:RUNNER_TEMP "morfeusz"
           if (-not (Test-Path $tempDir)) { New-Item -ItemType Directory -Path $tempDir -Force | Out-Null }
           $zipPath = Join-Path $tempDir "morfeusz2.zip"
@@ -54,14 +52,23 @@ jobs:
           $wheelUrl = ($meta.urls | Where-Object { $_.filename -like "*win_amd64*" } | Select-Object -First 1).url
           Write-Host "Pobieranie Morfeusz 2 z: $wheelUrl"
           Invoke-WebRequest -Uri $wheelUrl -OutFile $zipPath -UseBasicParsing
+          $actualSha = (Get-FileHash -Path $zipPath -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($actualSha -ne $expectedSha) {
+            Write-Error "Niezgodnosc SHA-256 morfeusz2: oczekiwano $expectedSha, otrzymano $actualSha"
+            exit 1
+          }
           Expand-Archive -Path $zipPath -DestinationPath $tempDir -Force
           $dll = Join-Path $tempDir "morfeusz2.dll"
           if (-not (Test-Path $dll)) {
             Write-Error "morfeusz2.dll nie znaleziony w rozpakowanym pakiecie."
             exit 1
           }
-          Write-Host "Morfeusz 2 DLL gotowy: $dll"
+          Copy-Item -Path $dll -Destination "Deployment/morfeusz2.dll" -Force
+          Write-Host "Morfeusz 2 DLL zweryfikowany (SHA-256) i skopiowany do Deployment/morfeusz2.dll"
           Add-Content -Path $env:GITHUB_ENV -Value "GALANONIM_MORFEUSZ=$dll"
+
+      - name: 5. Budowanie w konfiguracji Debug
+        run: dotnet build GalAnonim/GalAnonim.csproj -c Debug
 
       - name: 6. Uruchomienie testow jednostkowych (dotnet test)
         env:
@@ -74,7 +81,10 @@ jobs:
         run: dotnet test GalAnonim.Tests/GalAnonim.Tests.csproj -c Release
 
       - name: 7. Testy Frontendu JavaScript (node:test)
-        run: node --test GalAnonim.Tests/Frontend/hosted-batch.test.cjs
+        shell: powershell
+        run: |
+          $testFiles = Get-ChildItem -Path "GalAnonim.Tests/Frontend" -Filter "*.test.cjs" | ForEach-Object { $_.FullName }
+          node --test $testFiles
 
   smoke-test-windows:
     name: UI Smoke Test (WebView2)
