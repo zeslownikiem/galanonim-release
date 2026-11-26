@@ -71,7 +71,7 @@ jobs:
         run: dotnet build GalAnonim/GalAnonim.csproj -c Debug
 
       - name: 6. Uruchomienie testow jednostkowych (dotnet test)
-        shell: powershell
+        shell: pwsh
         env:
           REQUIRE_MORFEUSZ: '1'
           GAL_LIVE_API_TESTS: '1'
@@ -84,11 +84,11 @@ jobs:
             try {
               $null = Invoke-WebRequest -Uri "https://api.galanonim.pl/api/auth/me" `
                 -Headers @{ Authorization = "Bearer $($env:GAL_TOKEN_STANDARD.Trim())" } `
-                -UseBasicParsing -TimeoutSec 10 -ErrorAction Stop
+                -TimeoutSec 10 -ErrorAction Stop
             } catch {
               $code = if ($_.Exception.Response) { [int]$_.Exception.Response.StatusCode } else { 0 }
               if ($code -eq 401) {
-                Write-Host "::warning::Sekrety kont testowych GAL_TOKEN_* zwrocily HTTP 401 na api.galanonim.pl (wygasle tokeny sesyjne) — pomijanie LiveTierIntegrationTests do czasu ich odnowienia na backendzie."
+                Write-Host "::warning::GAL_TOKEN_* returned HTTP 401 on api.galanonim.pl (expired session tokens) - skipping LiveTierIntegrationTests until refreshed on backend."
                 $env:GAL_TOKEN_DEMO = ""
                 $env:GAL_TOKEN_STANDARD = ""
                 $env:GAL_TOKEN_PRO = ""
@@ -206,22 +206,20 @@ jobs:
             seed-enc-v1-
 
       - name: 2.2. Budowa zaszyfrowanego seeda slownika (Resources/galanonim.db.enc)
-        shell: powershell
+        shell: pwsh
         env:
           GAL_WORDLIST_KEY: ${{ secrets.GAL_WORDLIST_KEY }}
           GAL_TOKEN_STANDARD: ${{ secrets.GAL_TOKEN_STANDARD }}
         run: |
           dotnet run --project Tools/DbImporter -c Release -- build-seed GalAnonim/Resources/galanonim.db.enc
           if ($LASTEXITCODE -ne 0) {
-            Write-Host "::warning::Pobranie pełnego seeda z api.galanonim.pl nie powiodło się (np. wygasły GAL_TOKEN_STANDARD) — generowanie zaszyfrowanego seeda awaryjnego pod kompilację testową CI..."
+            Write-Host "::warning::Seed download from api.galanonim.pl failed (expired GAL_TOKEN_STANDARD) - building encrypted fallback CI seed..."
             $tmpDir = Join-Path $env:RUNNER_TEMP "fallback_seed"
             New-Item -ItemType Directory -Path $tmpDir -Force | Out-Null
             Set-Content -Path "$tmpDir\forms.csv" -Value "SurfaceForm,Category`r`nKowalski,LastName`r`nWarszawa,City`r`nPolna,Street`r`nJan,FirstName" -Encoding UTF8
             Set-Content -Path "$tmpDir\preps.csv" -Value "Preposition`r`nw`r`nul." -Encoding UTF8
-            Copy-Item "GalAnonim\Tests\Fixtures\exported_rows_wordlist.csv" "$tmpDir\rows.csv" -ErrorAction SilentlyContinue
-            if (-not (Test-Path "$tmpDir\rows.csv")) {
-              Copy-Item "GalAnonim.Tests\Fixtures\exported_rows_wordlist.csv" "$tmpDir\rows.csv"
-            }
+            $srcRows = if (Test-Path "GalAnonim.Tests\Fixtures\exported_rows_wordlist.csv") { "GalAnonim.Tests\Fixtures\exported_rows_wordlist.csv" } else { "GalAnonim\Tests\Fixtures\exported_rows_wordlist.csv" }
+            Copy-Item $srcRows "$tmpDir\rows.csv" -Force
             dotnet run --project Tools/DbImporter -c Release -- build GalAnonim/Resources/galanonim.db.enc "$tmpDir\forms.csv" "$tmpDir\preps.csv" "$tmpDir\rows.csv"
           }
 
